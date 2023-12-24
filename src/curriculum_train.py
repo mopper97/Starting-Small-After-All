@@ -1,16 +1,16 @@
-from transformers import RobertaConfig, RobertaForMaskedLM, RobertaTokenizer
+from transformers import RobertaConfig, RobertaForMaskedLM, RobertaTokenizer, get_linear_schedule_with_warmup
 from transformers import  DataCollatorForLanguageModeling
 from transformers import Trainer, TrainingArguments
 from tqdm import tqdm
 from argparse import ArgumentParser
-
-
+from torch.optim import AdamW
 
 
 # 2. Define Function for Loading Dataset
 def load_dataset(train_paths, tokenizer):
     dataset = []
     for path in train_paths:
+        print("Loading dataset from: ", path)
         with open(path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             for line in tqdm(lines):
@@ -25,9 +25,7 @@ def main(args):
     tokenizer = RobertaTokenizer.from_pretrained("tokenizer/", max_len=512, truncation=True)
 
     # 3. Load the Dataset(s)
-    train_dataset = load_dataset(["../data/aochildes.train", "../data/bnc_spoken.train", "../data/cbt.train", "../data/children_stories.train", 
-                                  "../data/gutenberg.train", "../data/open_subtitles.train", "../data/qed.train", "../data/simple_wikipedia.train",
-                                  "../data/switchboard.train", "../data/wiki103.train"], tokenizer)
+    train_dataset = load_dataset(["../data/aochildes.train"], tokenizer)
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True)
 
@@ -61,27 +59,29 @@ def main(args):
         optimizer, num_warmup_steps=args.max_steps/10, num_training_steps=args.max_steps
     )
 
-    # 6. Train the Model
+
+    # 7. Train the Model
     trainer = Trainer(
         model=model,
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset,
-        optimizers=(optimizer, scheduler)
+        optimizers=(optimizer, scheduler),
     )
 
     trainer.train()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description='Pretraining Script')
+    # defaults for model hyperparameters are set to the tiny configuration 
     parser.add_argument('--hs', type=int, default=256, help='hidden size')
     parser.add_argument('--na', type=int, default=4, help='number of attention heads')
     parser.add_argument('--nl', type=int, default=4, help='number of layers')
     parser.add_argument('--ffn', type=int, default=1024, help='ffn size')
     parser.add_argument('--save_path', type=str, default='../models/test', help='path to save model')
-    parser.add_argument('--max_steps', type=int, default=160000, help='number of training steps')
+    parser.add_argument('--max_steps', type=int, default=40000, help='number of training steps')
     parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--gas', type=int, default=4, help='gradient accumulation steps')
-    parser.add_argument('--save_steps', type=int, default=20000, help='save model every n steps')
+    parser.add_argument('--save_steps', type=int, default=10000, help='save model every n steps')
     args = parser.parse_args()
     main(args)
