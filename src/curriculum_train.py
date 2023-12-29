@@ -50,8 +50,6 @@ def main(args):
         model = RobertaForMaskedLM(config=config)
 
 
-    model = RobertaForMaskedLM(config=config)
-
     # 5. Define Training Arguments
     training_args = TrainingArguments(
         output_dir=args.save_path,  # Replace with the path where you want to save the model
