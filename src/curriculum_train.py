@@ -4,7 +4,7 @@ from transformers import Trainer, TrainingArguments
 from tqdm import tqdm
 from argparse import ArgumentParser
 from torch.optim import AdamW
-
+import torch
 
 # 2. Define Function for Loading Dataset
 def load_dataset(train_paths, tokenizer):
@@ -25,20 +25,29 @@ def main(args):
     tokenizer = RobertaTokenizer.from_pretrained("tokenizer/", max_len=512, truncation=True)
 
     # 3. Load the Dataset(s)
-    train_dataset = load_dataset(["../data/aochildes.train"], tokenizer)
+    train_dataset = load_dataset([ "../data/cbt.train", "../data/children_stories.train", "../data/gutenberg.train", "../data/simple_wikipedia.train", "../data/wiki103.train"], tokenizer)
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True)
 
-    # 4. Configure the Model
-    config = RobertaConfig(
-    vocab_size=30_000,  # we align this to the tokenizer vocab_size
-    max_position_embeddings=514,
-    hidden_size=args.hs,
-    num_attention_heads=args.na,
-    num_hidden_layers=args.nl,
-    type_vocab_size=1,
-    intermediate_size=args.ffn,
-    position_embedding_type='relative_key_query')
+    # 4. Configure and load the Model
+    if args.load_path:
+        model = RobertaForMaskedLM.from_pretrained(args.load_path)
+        model.to('cuda')
+
+
+    else:
+        config = RobertaConfig(
+        vocab_size=30_000,  # we align this to the tokenizer vocab_size
+        max_position_embeddings=514,
+        hidden_size=args.hs,
+        num_attention_heads=args.na,
+        num_hidden_layers=args.nl,
+        type_vocab_size=1,
+        intermediate_size=args.ffn,
+        position_embedding_type='relative_key_query')
+
+
+        model = RobertaForMaskedLM(config=config)
 
 
     model = RobertaForMaskedLM(config=config)
@@ -58,6 +67,10 @@ def main(args):
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=args.max_steps/10, num_training_steps=args.max_steps
     )
+
+    # optionally load optimizer from checkpoint
+    if args.load_path:
+        optimizer.load_state_dict(torch.load(args.load_path + "/optimizer.pt"))
 
 
     # 7. Train the Model
@@ -83,5 +96,6 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=16, help='batch size')
     parser.add_argument('--gas', type=int, default=4, help='gradient accumulation steps')
     parser.add_argument('--save_steps', type=int, default=10000, help='save model every n steps')
+    parser.add_argument('--load_path', type=str, default=None, help='path to load model')
     args = parser.parse_args()
     main(args)
